@@ -2,8 +2,9 @@ import tensorflow as tf
 from tensorflow import keras
 from keras import layers
 import numpy as np
+import time
 
-import math_utils as math
+import neural_net.math_utils as math
 
 
 class PDENet:
@@ -45,41 +46,56 @@ class PDENet:
         self.loss = 0
 
 
-    def train(self, epochs):
+    def train(self, epochs, socket, database):
         steps_per_epoch = 100
 
         for epoch in range(epochs):
             for step in range(steps_per_epoch):
-                print('Epoch #', str(epoch), ', Step #', str(step))
                 self.train_step()
 
-            # Report progress after each epoch
-            print('Epoch', str(epoch), '/', str(epochs), '; Loss:', self.loss)
+            # Report and save progress after each epoch
+            cursor = database.cursor()
+
+            insert_statement = 'INSERT INTO `epochs` (`num`, `total`, `loss`) VALUES (%s, %s, %s)'
+            insert_data = (epoch + 1, epochs, self.loss)
+            cursor.execute(insert_statement, insert_data)
+
+            database.commit()
+            cursor.close()
+
+            try:
+                socket.emit('data', {'num': epoch + 1, 'total': epochs, 'loss': self.loss})
+            except Exception:
+                pass
 
 
+    # Calculate the loss function and backpropagate the gradient
     @tf.function()
     def train_step(self):
         input = self.input
 
         with tf.GradientTape() as tape:
+            # Get the model output and calculate loss
             output = self.model(input)
             self.loss = self.pde_loss(output)
 
+        # Apply the gradient weight to the model
         grad = tape.gradient(loss, self.model)
         self.optimizer.apply_gradients([(grad, self.model)])
 
 
+    # Find the loss from a given PDE output
     def pde_loss(self, H):
         scalar_loss = 0
         input = self.input
 
+        # Loop though each hypothesis value and input domain
         for k in range(len(input)):
             D = input[k]
             H = input[k]
 
             for i in range(len(H)):
                 for j in range(len(H[i])):
-                    print(i, j)
                     loss = 0
 
                     # Hypothesis function values

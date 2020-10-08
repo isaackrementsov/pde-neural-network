@@ -1,0 +1,39 @@
+.jumbotron {
+    background: linear-gradient(45deg, #2962FF, #E040FB);
+    border-radius: 0;
+    color: white;
+}
+.jumbotron h1 {
+    font-weight: bold;
+}
+
+h3 {
+    font-weight: 200;
+    width: 100%;
+}
+
+.epoch {
+    background-color: whitesmoke;
+    padding: 7px 15px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 17px;
+    color: #545454;
+    margin: 15px 0;
+}
+.epoch span {
+    font-weight: 200;
+    padding: 0 10px;
+}
+.epoch span b {
+    font-weight: 500;
+    padding-right: 5px;
+}
+
+#central {
+    border: 1px solid #E040FB;
+    border-radius: 5px;
+    padding: 50px;
+    height: 100%;
+}

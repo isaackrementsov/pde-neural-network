@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>PDENet Web Tracker</title>
+        <script src="/static/js/lib/jquery.min.js"></script>
+        <link type="text/css" rel="stylesheet" href="/static/css/lib/bootstrap.min.css"/>
+        <link type="text/css" rel="stylesheet" href="/static/css/main.css"/>
+    </head>
+    <body>
+        <div class="jumbotron text-center">
+            <h1>PDENet Web Tracker</h1>
+        </div>
+    </body>
+    <div class="row">
+        <div class="col-md-4"></div>
+        <div class="col-md-4" id="central">
+            <div class="row text-center"><h3>Training History</h3></div>
+            <hr/>
+            {% for epoch in epochs %}
+                <div class="row epoch">
+                    <span><b>Epoch</b> {{ epoch[0] }} of {{ epoch[1] }}</span>
+                    <span><b>Loss</b> {{ epoch[2] }}</span>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="col-md-4"></div>
+    </div>
+    <script src="/static/js/lib/sockets.js"></script>
+    <script src="/static/js/main.js"></script>
+</html>

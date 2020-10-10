@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow import keras
+import keras
 from keras import layers
 import numpy as np
 import time
@@ -11,20 +11,22 @@ class PDENet:
 
     # Initialize neural network
     def __init__(self, input, learning_rate, L, v, d_x_boundary, d_t_boundary, n_t_boundary):
+        shape = input.shape.as_list()
+
         # Conv2D model that takes in a domain matrix and returns a hypothesis value for each point on the domain
-        self.model = keras.Sequential([
-            layers.Conv2D(32, (4,4), input_shape=input.shape[1:]),
-            layers.MaxPooling2D((2,2)),
-            layers.Conv2D(64, (3,3), activation='relu'),
-            layers.MaxPooling2D((2,2)),
-            layers.Conv2D(64, (3,3), activation='relu'),
-            layers.MaxPooling2D((2,2)),
-            layers.Conv2DTranspose(3, (4,4), strides=(2,2)),
-            layers.Conv2DTranspose(2, (4,4), strides=(2,2)),
-            layers.Conv2DTranspose(1, (6,6), strides=(2,2))
-        ])
+        self.model = keras.Sequential()
+        self.model.add(layers.Conv2D(32, (4,4), input_shape=shape[1:]))
+        self.model.add(layers.MaxPooling2D((2,2)))
+        self.model.add(layers.Conv2D(64, (3,3), activation='relu'))
+        self.model.add(layers.MaxPooling2D((2,2)))
+        self.model.add(layers.Conv2D(64, (3,3), activation='relu'))
+        self.model.add(layers.MaxPooling2D((2,2)))
+        self.model.add(layers.Conv2DTranspose(3, (4,4), strides=(2,2)))
+        self.model.add(layers.Conv2DTranspose(2, (4,4), strides=(2,2)))
+        self.model.add(layers.Conv2DTranspose(1, (6,6), strides=(2,2)))
+
         # Use the Adam optimizer
-        self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate, beta_1=0.99, epsilon=1e-1)
+        self.optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.99, epsilon=1e-1)
         self.input = input
 
         # Get an example domain matrix
@@ -43,17 +45,11 @@ class PDENet:
         self.n_t_boundary = n_t_boundary
 
         # Initialize loss variable for metrics
-        self.loss = 0
+        self.loss = -1
 
 
-    def train(self, epochs, socket, database):
-        steps_per_epoch = 100
-
-        for epoch in range(epochs):
-            for step in range(steps_per_epoch):
-                self.train_step()
-
-            # Report and save progress after each epoch
+    # Broadcast and save progress
+    def reportProgress(self, epoch, epochs, database):
             cursor = database.cursor()
 
             insert_statement = 'INSERT INTO `epochs` (`num`, `total`, `loss`) VALUES (%s, %s, %s)'
@@ -63,14 +59,29 @@ class PDENet:
             database.commit()
             cursor.close()
 
+            # There will be an exception if the socket client is not connected yet - in that case, the message should not be broadcast
             try:
                 socket.emit('data', {'num': epoch + 1, 'total': epochs, 'loss': self.loss})
             except Exception:
                 pass
 
 
+    def train(self, epochs, socket, database):
+        steps_per_epoch = 100
+
+        # Send an initial report to the Socket client
+        self.reportProgress(-1, epochs, database)
+
+        for epoch in range(epochs):
+            for step in range(steps_per_epoch):
+                self.train_step()
+
+            # Report and save progress after each epoch
+            self.reportProgress(epoch, epochs, database)
+
+
     # Calculate the loss function and backpropagate the gradient
-    @tf.function()
+    #@tf.function()
     def train_step(self):
         input = self.input
 
@@ -88,14 +99,15 @@ class PDENet:
     def pde_loss(self, H):
         scalar_loss = 0
         input = self.input
+        shape = input.shape.as_list()
 
         # Loop though each hypothesis value and input domain
-        for k in range(len(input)):
+        for k in range(shape[0]):
             D = input[k]
             H = input[k]
 
-            for i in range(len(H)):
-                for j in range(len(H[i])):
+            for i in range(shape[1]):
+                for j in range(shape[2]):
                     loss = 0
 
                     # Hypothesis function values
@@ -107,7 +119,7 @@ class PDENet:
                     if i == 0:
                         # Forward difference
                         h_xx = math.d2(d=self.dx, u=h, u_b=H[i + 1][j], u_b2=H[i + 2][j])
-                    elif i == len(H) - 1:
+                    elif i == shape[1] - 1:
                         # Backwards difference
                         h_xx = math.d2(d=self.dx, u=h, u_a=H[i - 1][j], u_a2=H[i - 2][j])
                     else:
@@ -117,7 +129,7 @@ class PDENet:
                     if j == 0:
                         # Forward difference
                         h_tt = math.d2(d=self.dt, u=h, u_b=H[i][j + 1], u_b2=H[i][j + 2])
-                    elif j == len(H[i]) - 1:
+                    elif j == shape[2] - 1:
                         # Backwards difference
                         h_tt = math.d2(d=self.dt, u=h, u_a=H[i][j - 1], u_a2=H[i][j - 2])
                     else:
